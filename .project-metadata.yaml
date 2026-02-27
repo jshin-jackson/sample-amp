@@ -108,6 +108,7 @@ tasks:
     entity_label: usage_score_predictor
     script: 3_model-usage-predictor/predict.py
     function: predict
+    kernel: python3
     short_summary: Register the Usage Score Predictor model
     long_summary: >-
       Registers the predict() function in predict.py as a CML Model endpoint.
@@ -121,13 +122,10 @@ tasks:
   # ---------------------------------------------------------------
   - type: build_model
     entity_label: usage_score_predictor
-    comment: "Level 4 initial build"
     short_summary: Build the Usage Score Predictor serving image
     long_summary: >-
       Packages the project files (including model.pkl) into a Docker image
       that serves the predict() function as a REST API endpoint.
-    cpu: 2
-    memory: 4
 
   # ---------------------------------------------------------------
   # Step 7: Model — Deploy the model as a REST API endpoint
