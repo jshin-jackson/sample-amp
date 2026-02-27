@@ -1,24 +1,22 @@
 """
 CML Application Launcher for Streamlit
 =======================================
-Uses os.execv() to replace the IPython kernel process with Streamlit.
-Streamlit runs directly on CDSW_APP_PORT so CML's health check passes.
-
-NOTE: If the Application shows 'Starting' after many failed restart
-attempts, delete the Application from CML UI and redeploy the AMP.
-Accumulated orphan processes from previous runs may hold the port.
-A fresh container (new deployment) will always work correctly.
+- Keep Python process alive (CML monitors it as the application process)
+- Run Streamlit as a child process on port 8501 (CDSW_APP_PORT is owned by CML proxy)
+- Stream Streamlit output directly to CML Application Logs (no capture)
 """
 
 import os
+import subprocess
 import sys
 
 port = os.environ.get("CDSW_APP_PORT", "8100")
 
-print(f"[launcher] Replacing kernel with Streamlit on port {port}")
+print(f"[launcher] CDSW_APP_PORT={port}")
+print(f"[launcher] Starting Streamlit on port {port}...")
+sys.stdout.flush()
 
-os.execv(
-    sys.executable,
+proc = subprocess.Popen(
     [
         sys.executable, "-m", "streamlit", "run",
         "2_app-streamlit/app.py",
@@ -28,5 +26,13 @@ os.execv(
         "--server.enableXsrfProtection", "false",
         "--browser.gatherUsageStats", "false",
         "--server.headless", "true",
-    ],
+    ]
+    # stdout/stderr not captured → goes directly to CML Application Logs
 )
+
+print(f"[launcher] Streamlit PID={proc.pid}. Waiting...")
+sys.stdout.flush()
+
+proc.wait()
+
+print(f"[launcher] Streamlit exited (rc={proc.returncode})")
