@@ -83,19 +83,19 @@ tasks:
       and will be loaded by the Streamlit dashboard application.
 
   # ---------------------------------------------------------------
-  # Step 4: Session — Train and save the model artifact
+  # Step 4: Session — Train the model and log evaluation metrics
   # ---------------------------------------------------------------
-  # IMPORTANT: This must run BEFORE build_model, which packages model.pkl
-  # into the serving Docker image.
+  # NOTE: predict.py trains the model inline at startup (no model.pkl needed).
+  # This session exists to demonstrate the training process and log metrics.
   - type: run_session
     name: Train Usage Score Predictor
     script: 3_model-usage-predictor/train.py
-    short_summary: Train a LinearRegression model and save model.pkl
+    short_summary: Train LinearRegression and log R2/MAE evaluation metrics
     long_summary: >-
       Trains a scikit-learn LinearRegression model on the sample dataset
-      (active_users → usage_score) and saves the artifact to
-      3_model-usage-predictor/model.pkl. This file must exist before
-      build_model packages it into the model serving image.
+      (active_users -> usage_score) and logs evaluation metrics (R2, MAE).
+      The serving function (predict.py) trains the same model inline at
+      container startup, so this session is for visibility and validation only.
     kernel: python3
     cpu: 2
     memory: 4

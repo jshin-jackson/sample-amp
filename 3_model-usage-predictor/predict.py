@@ -4,6 +4,15 @@ Level 4 - CML Model Serving Function
 This file is registered with CML via the 'create_model' task.
 The 'predict' function becomes the REST API endpoint.
 
+Design note:
+  The model is trained at module import time (when the serving container starts).
+  This avoids any dependency on model.pkl, which is a runtime-generated artifact
+  that is NOT included in the git-committed project snapshot that build_model
+  packages into the Docker image.
+
+  For large models (e.g. LLMs), you would load a pre-trained artifact from
+  object storage (S3/ADLS). For this learning example, inline training is used.
+
 CML Model API:
   POST /api/v1/predict
   Authorization: Bearer <model-access-key>
@@ -13,29 +22,17 @@ CML Model API:
   Response body: {"active_users": 350, "predicted_score": 87.5, "model": "LinearRegression"}
 
 Test from the CML UI:
-  Models → Usage Score Predictor → Test → enter {"active_users": 350}
-
-Constraints:
-  - Function name must match 'function' field in create_model task
-  - Input/output must be JSON-serializable dicts
-  - model.pkl must exist before build_model runs (created by train.py)
+  Models → Usage Score Predictor → Test tab → enter {"active_users": 350}
 """
 
-import pickle
+from sklearn.linear_model import LinearRegression
 
-# ── Model loading (lazy, cached after first call) ──────────────────────────────
+# ── Train at module load time (runs once when the serving container starts) ────
+# Same dataset as 1_job-data-report/report.py
+_X = [[500], [320], [210], [180], [145]]   # active_users
+_y = [98,    87,    76,    91,    83]       # usage_score
 
-_MODEL_PATH = "3_model-usage-predictor/model.pkl"
-_model = None
-
-
-def _load_model():
-    """Load the model from disk on first call, then cache in module-level variable."""
-    global _model
-    if _model is None:
-        with open(_MODEL_PATH, "rb") as f:
-            _model = pickle.load(f)
-    return _model
+_model = LinearRegression().fit(_X, _y)
 
 
 # ── Serving function ───────────────────────────────────────────────────────────
@@ -51,21 +48,19 @@ def predict(args):
     Returns:
         dict:
             active_users (int):       Echo of input value.
-            predicted_score (float):  Predicted usage score, clamped to [0, 100].
+            predicted_score (float):  Predicted score, clamped to [0, 100].
             model (str):              Model class name for traceability.
 
     Example:
         Input:  {"active_users": 350}
-        Output: {"active_users": 350, "predicted_score": 87.5, "model": "LinearRegression"}
+        Output: {"active_users": 350, "predicted_score": 90.2, "model": "LinearRegression"}
     """
-    model = _load_model()
-
     active_users = int(args.get("active_users", 200))
-    raw_score = float(model.predict([[active_users]])[0])
+    raw_score = float(_model.predict([[active_users]])[0])
     predicted_score = round(max(0.0, min(100.0, raw_score)), 1)
 
     return {
         "active_users": active_users,
         "predicted_score": predicted_score,
-        "model": type(model).__name__,
+        "model": type(_model).__name__,
     }
