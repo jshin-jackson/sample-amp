@@ -1,11 +1,11 @@
 name: Hello World AMP
 description: >-
-  Level 3 AMP example for beginners learning Cloudera AI.
-  Demonstrates required and optional environment variables that control
-  runtime behavior of a Streamlit dashboard application.
+  Level 4 AMP example for beginners learning Cloudera AI.
+  Demonstrates model training, registration, build, and deployment using
+  create_model, build_model, and deploy_model tasks.
 author: Your Name
 specification_version: 1.0
-prototype_version: 4.0
+prototype_version: 5.0
 date: "2026-02-27"
 
 runtimes:
@@ -83,7 +83,68 @@ tasks:
       and will be loaded by the Streamlit dashboard application.
 
   # ---------------------------------------------------------------
-  # Step 4: Application — Launch the Streamlit dashboard
+  # Step 4: Session — Train and save the model artifact
+  # ---------------------------------------------------------------
+  # IMPORTANT: This must run BEFORE build_model, which packages model.pkl
+  # into the serving Docker image.
+  - type: run_session
+    name: Train Usage Score Predictor
+    script: 3_model-usage-predictor/train.py
+    short_summary: Train a LinearRegression model and save model.pkl
+    long_summary: >-
+      Trains a scikit-learn LinearRegression model on the sample dataset
+      (active_users → usage_score) and saves the artifact to
+      3_model-usage-predictor/model.pkl. This file must exist before
+      build_model packages it into the model serving image.
+    kernel: python3
+    cpu: 2
+    memory: 4
+
+  # ---------------------------------------------------------------
+  # Step 5: Model — Register the model serving function with CML
+  # ---------------------------------------------------------------
+  - type: create_model
+    name: Usage Score Predictor
+    entity_label: usage_score_predictor
+    script: 3_model-usage-predictor/predict.py
+    function: predict
+    short_summary: Register the Usage Score Predictor model
+    long_summary: >-
+      Registers the predict() function in predict.py as a CML Model endpoint.
+      The function accepts {"active_users": <int>} and returns a predicted
+      usage score. The model artifact (model.pkl) will be packaged during build.
+    cpu: 1
+    memory: 2
+
+  # ---------------------------------------------------------------
+  # Step 6: Model — Build the model serving Docker image
+  # ---------------------------------------------------------------
+  - type: build_model
+    entity_label: usage_score_predictor
+    comment: "Level 4 initial build"
+    short_summary: Build the Usage Score Predictor serving image
+    long_summary: >-
+      Packages the project files (including model.pkl) into a Docker image
+      that serves the predict() function as a REST API endpoint.
+    cpu: 2
+    memory: 4
+
+  # ---------------------------------------------------------------
+  # Step 7: Model — Deploy the model as a REST API endpoint
+  # ---------------------------------------------------------------
+  - type: deploy_model
+    entity_label: usage_score_predictor
+    short_summary: Deploy the Usage Score Predictor as a REST API
+    long_summary: >-
+      Deploys the built model image. Once Running, the model is available
+      as a REST endpoint. Test it from Models menu → Usage Score Predictor
+      → Test tab with input: {"active_users": 350}
+    cpu: 1
+    memory: 2
+    replicas: 1
+
+  # ---------------------------------------------------------------
+  # Step 8: Application — Launch the Streamlit dashboard
   # ---------------------------------------------------------------
   - type: start_application
     name: Data Report Dashboard
