@@ -1,0 +1,20 @@
+name: Hello World AMP
+description: The simplest possible AMP example for beginners learning Cloudera AI.
+author: Your Name
+specification_version: 1.0
+prototype_version: 1.0
+date: "2026-02-27"
+
+runtimes:
+  - editor: Workbench
+    kernel: Python 3.11
+    edition: Standard
+
+tasks:
+  - type: run_session
+    name: Hello World
+    script: 0_session-hello-world/hello_world.py
+    short_summary: Install dependencies and print Hello World message
+    kernel: python3
+    cpu: 1
+    memory: 2
