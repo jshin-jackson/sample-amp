@@ -31,8 +31,8 @@ tasks:
     script: 0_session-install-deps/install_deps.py
     short_summary: Install required Python packages from requirements.txt
     kernel: python3
-    cpu: 1
-    memory: 2
+    cpu: 2
+    memory: 4
 
   # ---------------------------------------------------------------
   # Step 2: Job — Create the data report job definition
@@ -42,8 +42,8 @@ tasks:
     entity_label: data_report_job
     script: 1_job-data-report/report.py
     arguments: None
-    cpu: 1
-    memory: 2
+    cpu: 2
+    memory: 4
     short_summary: Create a job that generates a data summary report
     long_summary: >-
       Creates a CML Job that reads a sample dataset, computes summary statistics
@@ -73,7 +73,7 @@ tasks:
       interactive dashboard with KPI metrics, charts, and a raw data table.
     subdomain: hello-world-amp
     script: 2_app-streamlit/app.py
-    cpu: 1
-    memory: 2
+    cpu: 2
+    memory: 4
     environment_variables:
       TASK_TYPE: START_APPLICATION
