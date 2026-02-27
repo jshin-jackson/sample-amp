@@ -22,20 +22,25 @@ def kill_process_on_port(port_num: int):
     hex_port = format(port_num, "04X")
     target_inode = None
 
-    # Step 1: Find the socket inode for the port in /proc/net/tcp
-    try:
-        with open("/proc/net/tcp") as f:
-            for line in f.readlines()[1:]:
-                fields = line.strip().split()
-                if len(fields) < 10:
-                    continue
-                local_port_hex = fields[1].split(":")[1]
-                if local_port_hex == hex_port:
-                    target_inode = fields[9]
-                    break
-    except Exception as e:
-        print(f"[launcher] Could not read /proc/net/tcp: {e}")
-        return
+    # Step 1: Find the socket inode for the port.
+    # Check both /proc/net/tcp (IPv4) and /proc/net/tcp6 (IPv6) because
+    # Streamlit may bind to either depending on the system configuration.
+    for proc_file in ("/proc/net/tcp6", "/proc/net/tcp"):
+        try:
+            with open(proc_file) as f:
+                for line in f.readlines()[1:]:
+                    fields = line.strip().split()
+                    if len(fields) < 10:
+                        continue
+                    local_port_hex = fields[1].split(":")[1]
+                    if local_port_hex == hex_port:
+                        target_inode = fields[9]
+                        break
+        except Exception:
+            continue
+        if target_inode:
+            print(f"[launcher] Found port {port_num} in {proc_file}")
+            break
 
     if not target_inode:
         print(f"[launcher] Port {port_num} is free.")
