@@ -1,13 +1,18 @@
 """
 CML Application Launcher for Streamlit
 =======================================
-Runs Streamlit via its internal Python API (not subprocess) so that
-CML's process termination also kills Streamlit — eliminating the
-'Port already in use' error caused by orphaned subprocesses.
+IPython kernels (used by CML) run their own asyncio event loop.
+Calling stcli.main() directly raises:
+  RuntimeError: asyncio.run() cannot be called from a running event loop
+
+Fix: run Streamlit inside a separate thread with its own event loop,
+fully isolated from IPython's event loop.
 """
 
+import asyncio
 import os
 import sys
+import threading
 
 port = os.environ.get("CDSW_APP_PORT", "8100")
 
@@ -22,5 +27,14 @@ sys.argv = [
     "--server.headless", "true",
 ]
 
-from streamlit.web import cli as stcli
-stcli.main()
+
+def run_streamlit():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    from streamlit.web import cli as stcli
+    stcli.main()
+
+
+thread = threading.Thread(target=run_streamlit)
+thread.start()
+thread.join()
