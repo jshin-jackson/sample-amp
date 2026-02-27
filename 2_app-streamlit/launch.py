@@ -9,17 +9,14 @@ CDSW_APP_PORT assigned by CML. This launcher handles both requirements.
 import os
 import subprocess
 import sys
+import time
 
 port = os.environ.get("CDSW_APP_PORT", "8100")
 
-# Release the port if it is already occupied by a previous instance.
-# This can happen when CML restarts the application before the old
-# process has fully terminated.
-subprocess.run(
-    f"fuser -k {port}/tcp",
-    shell=True,
-    capture_output=True,
-)
+# Kill any existing Streamlit processes before starting a new one.
+# 'fuser' is not available in CML runtime containers; use 'pkill' instead.
+subprocess.run(["pkill", "-f", "streamlit"], capture_output=True)
+time.sleep(2)
 
 subprocess.run(
     [
