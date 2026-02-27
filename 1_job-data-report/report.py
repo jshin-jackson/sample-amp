@@ -13,7 +13,6 @@ It demonstrates:
 import os
 import json
 import platform
-import sys
 from datetime import datetime
 
 import pandas as pd
@@ -128,7 +127,6 @@ def main():
     print_report(summary)
 
     log("Job completed successfully.")
-    sys.exit(0)
 
 
 if __name__ == "__main__":
