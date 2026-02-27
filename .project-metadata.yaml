@@ -1,10 +1,11 @@
 name: Hello World AMP
 description: >-
-  Level 2 AMP example for beginners learning Cloudera AI.
-  Demonstrates run_session, create_job/run_job, and start_application tasks.
+  Level 3 AMP example for beginners learning Cloudera AI.
+  Demonstrates required and optional environment variables that control
+  runtime behavior of a Streamlit dashboard application.
 author: Your Name
 specification_version: 1.0
-prototype_version: 3.0
+prototype_version: 4.0
 date: "2026-02-27"
 
 runtimes:
@@ -13,6 +14,7 @@ runtimes:
     edition: Standard
 
 environment_variables:
+  # ── Level 2: File I/O Configuration ─────────────────────────────────────────
   REPORT_OUTPUT_DIR:
     default: "outputs"
     description: "Directory path where the job saves CSV and JSON report files."
@@ -20,6 +22,25 @@ environment_variables:
   REPORT_NAME:
     default: "data_report"
     description: "Base filename for the generated report (without extension)."
+    required: false
+
+  # ── Level 3: Dashboard Runtime Configuration ─────────────────────────────────
+  DASHBOARD_TITLE:
+    description: >-
+      [REQUIRED] Custom title displayed in the dashboard header.
+      Example: "My Team's Data Report Dashboard"
+    required: true
+  SCORE_ALERT_THRESHOLD:
+    default: "80"
+    description: >-
+      Usage scores at or above this integer value are highlighted as
+      High Performers in the dashboard. Default is 80.
+    required: false
+  ENABLE_RAW_DATA_DOWNLOAD:
+    default: "true"
+    description: >-
+      Set to 'false' to hide the CSV download button in the Raw Dataset section.
+      Useful when the report data should not be exported.
     required: false
 
 tasks:

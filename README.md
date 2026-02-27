@@ -1,8 +1,8 @@
 # Hello World AMP
 
-> **Level 2** — Cloudera AI AMP Beginner Series: Session + Job + Streamlit Application
+> **Level 3** — Cloudera AI AMP Beginner Series: Advanced Environment Variables
 
-A hands-on reference AMP for learning Cloudera AI (CML) fundamentals. This prototype walks through three core CML task types in sequence — dependency installation, batch job execution, and a live interactive web dashboard — using only Python, pandas, and Streamlit.
+A hands-on reference AMP for learning Cloudera AI (CML) fundamentals. This prototype builds on Level 2 (Session + Job + Application) and demonstrates how to use **required** and **optional environment variables** to control runtime behavior of a deployed application.
 
 ---
 
@@ -16,14 +16,38 @@ A hands-on reference AMP for learning Cloudera AI (CML) fundamentals. This proto
 
 ---
 
+## What's New in Level 3
+
+Level 3 introduces three new environment variables that demonstrate different patterns for configuring AMP behavior at deploy time:
+
+| Variable | Type | Default | Pattern |
+|---|---|---|---|
+| `DASHBOARD_TITLE` | **Required** | _(none)_ | App validates at startup; shows error if missing |
+| `SCORE_ALERT_THRESHOLD` | Optional | `80` | Integer config; changes dashboard content |
+| `ENABLE_RAW_DATA_DOWNLOAD` | Optional | `true` | Boolean flag; controls UI feature visibility |
+
+### Required vs. Optional Environment Variables
+
+```
+Required  →  No default in .project-metadata.yaml
+           →  App checks os.environ.get(...) == "" and calls st.stop()
+           →  User MUST provide a value before the app works
+
+Optional  →  Has a sensible default in .project-metadata.yaml
+           →  App uses the default if not set
+           →  User CAN override to customize behavior
+```
+
+---
+
 ## Project Structure
 
 ```
 sample-amp/
-├── .project-metadata.yaml              # AMP runbook — defines all tasks, runtime, and env vars
+├── .project-metadata.yaml              # AMP runbook — tasks, runtime, env vars
 ├── catalog.yaml                         # AMP Catalog registration metadata
 ├── README.md                            # This file
-├── requirements.txt                     # Python dependencies (requests, pandas, streamlit)
+├── requirements.txt                     # Python dependencies
 ├── assets/
 │   └── cover.png                        # Catalog tile image
 ├── 0_session-install-deps/
@@ -32,7 +56,7 @@ sample-amp/
 │   └── report.py                        # Job: pandas data processing → CSV + JSON output
 └── 2_app-streamlit/
     ├── launch.py                        # Application launcher (IPython magic entry point)
-    └── app.py                           # Streamlit dashboard UI
+    └── app.py                           # Streamlit dashboard UI (Level 3 env vars)
 ```
 
 ---
@@ -72,9 +96,10 @@ sample-amp/
 ┌─────────────────────────────────────────────────────┐
 │ Step 4: start_application                            │
 │ Script: 2_app-streamlit/launch.py                    │
+│  - Validates DASHBOARD_TITLE is set (required)       │
 │  - Reads outputs/ files produced by the Job          │
-│  - Displays KPI metrics, bar chart, category table   │
-│  - Accessible at https://hello-world-amp.{domain}    │
+│  - Highlights products above SCORE_ALERT_THRESHOLD   │
+│  - Shows/hides download based on ENABLE_RAW_DATA_DOWNLOAD │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -104,10 +129,20 @@ streamlit==1.41.1
 
 ## Environment Variables
 
+### Level 2 — File I/O Configuration
+
 | Variable | Default | Required | Description |
 |---|---|---|---|
 | `REPORT_OUTPUT_DIR` | `outputs` | No | Directory where the job saves report files |
 | `REPORT_NAME` | `data_report` | No | Base filename for the generated report (no extension) |
+
+### Level 3 — Dashboard Runtime Configuration
+
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `DASHBOARD_TITLE` | _(none)_ | **Yes** | Custom title shown in the dashboard header. App will not start without this. |
+| `SCORE_ALERT_THRESHOLD` | `80` | No | Integer. Products with usage score ≥ this value are shown as High Performers. |
+| `ENABLE_RAW_DATA_DOWNLOAD` | `true` | No | Set to `false` to hide the CSV download button. |
 
 ---
 
@@ -115,7 +150,7 @@ streamlit==1.41.1
 
 | File | Format | Description |
 |---|---|---|
-| `outputs/data_report.csv` | CSV | Full sample dataset (20 rows × 5 columns) |
+| `outputs/data_report.csv` | CSV | Full sample dataset (5 rows × 4 columns) |
 | `outputs/data_report.json` | JSON | Summary statistics (mean, max, top product, etc.) |
 
 ---
@@ -125,11 +160,36 @@ streamlit==1.41.1
 | Section | Description |
 |---|---|
 | **KPI Metrics** | Total Users, Average Score, Top Product, Product Count |
-| **Bar Chart** | Usage Score per product (Altair chart) |
+| **High Performers** _(Level 3)_ | Products with score ≥ `SCORE_ALERT_THRESHOLD`, shown as metric cards with delta |
+| **Bar Chart** | Usage Score per product |
 | **Category Table** | Active User count grouped by category |
-| **Raw Data** | Expandable full dataset with CSV download button |
+| **Raw Data** | Expandable full dataset with 🏆 badge for high performers and optional CSV download |
 
-If the job output files are not found, the dashboard displays a friendly warning with instructions to run the Data Report Job first.
+---
+
+## Environment Variable Patterns in Code
+
+### Pattern 1 — Required Variable with Validation
+
+```python
+DASHBOARD_TITLE = os.environ.get("DASHBOARD_TITLE", "")
+
+if not DASHBOARD_TITLE:
+    st.error("Required environment variable `DASHBOARD_TITLE` is not set. ...")
+    st.stop()
+```
+
+### Pattern 2 — Optional Integer Variable
+
+```python
+SCORE_ALERT_THRESHOLD = int(os.environ.get("SCORE_ALERT_THRESHOLD", "80"))
+```
+
+### Pattern 3 — Optional Boolean Flag
+
+```python
+ENABLE_RAW_DATA_DOWNLOAD = os.environ.get("ENABLE_RAW_DATA_DOWNLOAD", "true").lower() == "true"
+```
 
 ---
 
@@ -150,7 +210,7 @@ CML runs application scripts inside an **IPython kernel**. The launcher (`launch
 | `--server.enableCORS` | `false` | CML's proxy handles CORS; Streamlit-level CORS would block dashboard access. |
 | `--server.enableXsrfProtection` | `false` | Requests proxied through CML do not carry Streamlit's XSRF tokens. |
 | `--server.headless` | `true` | Suppresses browser launch and email prompts in the container environment. |
-| `!` (single line) | — | CML's `python.dedent` parser crashes on `!` magic with backslash line continuations. The entire command must be on one line. |
+| `!` (single line) | — | CML's `python.dedent` parser crashes on `!` magic with backslash line continuations. |
 
 ---
 
@@ -159,9 +219,11 @@ CML runs application scripts inside an **IPython kernel**. The launcher (`launch
 ### From the AMP Catalog
 1. In Cloudera AI, go to **AMPs** in the left navigation panel.
 2. Find **Hello World AMP** and click **Deploy**.
-3. Optionally override `REPORT_OUTPUT_DIR` or `REPORT_NAME`.
-4. Click **Launch Project** and wait for all 4 tasks to complete.
-5. Go to **Applications** menu → open **Data Report Dashboard**.
+3. Set the **required** environment variable:
+   - `DASHBOARD_TITLE` — e.g. `My Team's Data Report Dashboard`
+4. Optionally override other variables.
+5. Click **Launch Project** and wait for all 4 tasks to complete.
+6. Go to **Applications** menu → open **Data Report Dashboard**.
 
 ### Redeployment Notes
 - If you need to redeploy the Application task, always **Delete** the existing Application first (do not just Restart).
@@ -171,14 +233,12 @@ CML runs application scripts inside an **IPython kernel**. The launcher (`launch
 
 ## Learning Path
 
-This AMP is part of a progressive series:
-
-| Level | Title | Task Types Added |
+| Level | Title | What's Introduced |
 |---|---|---|
 | 0 | Hello World Session | `run_session` |
 | 1 | Session + Batch Job | `create_job`, `run_job` |
-| **2** | **Session + Job + App** ← *this AMP* | `start_application` |
-| 3 | User Configuration | `environment_variables` (advanced) |
+| 2 | Session + Job + App | `start_application`, Streamlit |
+| **3** | **Advanced Env Vars** ← *this AMP* | Required env var validation, Boolean/Integer type conversion |
 | 4 | Model Deployment | `create_model`, `build_model`, `deploy_model` |
 | 5 | GPU / LLM Serving | GPU Edition, Custom Runtime |
 
