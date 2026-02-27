@@ -1,8 +1,10 @@
 name: Hello World AMP
-description: The simplest possible AMP example for beginners learning Cloudera AI.
+description: >-
+  Level 1 AMP example for beginners learning Cloudera AI.
+  Demonstrates run_session for dependency setup and create_job/run_job for batch data processing.
 author: Your Name
 specification_version: 1.0
-prototype_version: 1.0
+prototype_version: 2.0
 date: "2026-02-27"
 
 runtimes:
@@ -10,11 +12,51 @@ runtimes:
     kernel: Python 3.11
     edition: Standard
 
+environment_variables:
+  REPORT_OUTPUT_DIR:
+    default: "outputs"
+    description: "Directory path where the job will save CSV and JSON report files."
+    required: false
+  REPORT_NAME:
+    default: "data_report"
+    description: "Base filename for the generated report (without extension)."
+    required: false
+
 tasks:
+  # ---------------------------------------------------------------
+  # Step 1: Session — Install Python dependencies
+  # ---------------------------------------------------------------
   - type: run_session
-    name: Hello World
-    script: 0_session-hello-world/hello_world.py
-    short_summary: Install dependencies and print Hello World message
+    name: Install Dependencies
+    script: 0_session-install-deps/install_deps.py
+    short_summary: Install required Python packages from requirements.txt
     kernel: python3
     cpu: 1
     memory: 2
+
+  # ---------------------------------------------------------------
+  # Step 2: Job — Create the data report job definition
+  # ---------------------------------------------------------------
+  - type: create_job
+    name: Data Report Job
+    entity_label: data_report_job
+    script: 1_job-data-report/report.py
+    arguments: None
+    cpu: 1
+    memory: 2
+    short_summary: Create a job that generates a data summary report
+    long_summary: >-
+      Creates a CML Job that reads a sample dataset, computes summary statistics
+      using pandas, and writes a CSV and JSON report to the outputs/ directory.
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+
+  # ---------------------------------------------------------------
+  # Step 3: Job — Execute the data report job
+  # ---------------------------------------------------------------
+  - type: run_job
+    entity_label: data_report_job
+    short_summary: Run the data report job
+    long_summary: >-
+      Executes the Data Report Job. Check the Job run history in the Jobs menu
+      to view logs and download the generated report files from outputs/.
