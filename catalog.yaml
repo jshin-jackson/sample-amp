@@ -1,0 +1,35 @@
+name: jshin-jackson
+
+entries:
+  - title: Hello World AMP
+    label: sample-amp
+    short_description: |
+      The simplest possible Cloudera AI AMP example for beginners.
+      Runs a single session to install dependencies and print a Hello World message.
+    long_description: |
+      This AMP is Level 0 of a progressive AMP learning series designed for those
+      new to Cloudera AI Applied ML Prototypes (AMPs).
+
+      It demonstrates the minimal required structure of an AMP:
+      - .project-metadata.yaml (AMP runbook)
+      - A single run_session task
+      - requirements.txt for dependency management
+
+      Runtime: Python 3.11 / Workbench / Standard
+      Resources: 1 vCPU, 2 GB Memory
+
+      Learning Path:
+        Level 0 - Hello World (this AMP) — run_session
+        Level 1 - Add a Job — create_job / run_job
+        Level 2 - Deploy a Model — create_model
+        Level 3 - Launch an Application — start_application
+    image_path: >-
+      https://raw.githubusercontent.com/jshin-jackson/sample-amp/main/assets/cover.png
+    tags:
+      - Hello World
+      - Beginner
+      - Python 3.11
+      - Tutorial
+      - Session
+    git_url: "https://github.com/jshin-jackson/sample-amp"
+    is_prototype: true
