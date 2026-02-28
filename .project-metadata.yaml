@@ -1,9 +1,9 @@
-name: Hello World AMP
+name: Jackson's AMP
 description: >-
   Level 4 AMP example for beginners learning Cloudera AI.
   Demonstrates model training, registration, build, and deployment using
   create_model, build_model, and deploy_model tasks.
-author: Your Name
+author: Jackson Shin
 specification_version: 1.0
 prototype_version: 5.0
 date: "2026-02-27"
