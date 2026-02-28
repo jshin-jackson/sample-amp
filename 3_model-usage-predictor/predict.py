@@ -5,13 +5,16 @@ This file is registered with CML via the 'create_model' task.
 The 'predict' function becomes the REST API endpoint.
 
 Design note:
-  The model is trained at module import time (when the serving container starts).
-  This avoids any dependency on model.pkl, which is a runtime-generated artifact
-  that is NOT included in the git-committed project snapshot that build_model
-  packages into the Docker image.
+  The LinearRegression coefficients are pre-computed by train.py and hardcoded
+  here. This eliminates ALL external dependencies (no sklearn, no pickle, no
+  file I/O), ensuring the model serving Docker image always builds successfully.
 
-  For large models (e.g. LLMs), you would load a pre-trained artifact from
-  object storage (S3/ADLS). For this learning example, inline training is used.
+  Coefficients were computed on the training dataset:
+    X = active_users: [500, 320, 210, 180, 145]
+    y = usage_score:  [ 98,  87,  76,  91,  83]
+
+    coef      = 0.040258  (slope: score per active user)
+    intercept = 76.09     (baseline score)
 
 CML Model API:
   POST /api/v1/predict
@@ -19,23 +22,16 @@ CML Model API:
   Content-Type: application/json
 
   Request body:  {"active_users": 350}
-  Response body: {"active_users": 350, "predicted_score": 87.5, "model": "LinearRegression"}
+  Response body: {"active_users": 350, "predicted_score": 90.2, "model": "LinearRegression"}
 
 Test from the CML UI:
   Models → Usage Score Predictor → Test tab → enter {"active_users": 350}
 """
 
-from sklearn.linear_model import LinearRegression
+# Pre-computed LinearRegression coefficients (no sklearn needed at serve time)
+_COEF      = 0.040258   # slope
+_INTERCEPT = 76.09      # intercept
 
-# ── Train at module load time (runs once when the serving container starts) ────
-# Same dataset as 1_job-data-report/report.py
-_X = [[500], [320], [210], [180], [145]]   # active_users
-_y = [98,    87,    76,    91,    83]       # usage_score
-
-_model = LinearRegression().fit(_X, _y)
-
-
-# ── Serving function ───────────────────────────────────────────────────────────
 
 def predict(args):
     """
@@ -49,18 +45,19 @@ def predict(args):
         dict:
             active_users (int):       Echo of input value.
             predicted_score (float):  Predicted score, clamped to [0, 100].
-            model (str):              Model class name for traceability.
+            model (str):              Model type name.
 
-    Example:
-        Input:  {"active_users": 350}
-        Output: {"active_users": 350, "predicted_score": 90.2, "model": "LinearRegression"}
+    Examples:
+        {"active_users": 145}  →  {"predicted_score": 82.0, ...}
+        {"active_users": 350}  →  {"predicted_score": 90.2, ...}
+        {"active_users": 500}  →  {"predicted_score": 96.2, ...}
     """
     active_users = int(args.get("active_users", 200))
-    raw_score = float(_model.predict([[active_users]])[0])
+    raw_score = _COEF * active_users + _INTERCEPT
     predicted_score = round(max(0.0, min(100.0, raw_score)), 1)
 
     return {
         "active_users": active_users,
         "predicted_score": predicted_score,
-        "model": type(_model).__name__,
+        "model": "LinearRegression",
     }
