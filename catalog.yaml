@@ -23,10 +23,10 @@ entries:
         Level 1 - Add a Job — create_job / run_job
         Level 2 - Deploy a Model — create_model
         Level 3 - Launch an Application — start_application
-    image_path: >-
+    image_path:
       https://raw.githubusercontent.com/jshin-jackson/sample-amp/main/assets/cover.png
     tags:
-      - Hello World
+      - Jackson's AMP
       - Beginner
       - Python 3.11
       - Tutorial

@@ -120,8 +120,8 @@ tasks:
   # ---------------------------------------------------------------
   - type: deploy_model
     entity_label: usage_score_predictor
-    cpu: 1
-    memory: 2
+    cpu: 4
+    memory: 8
     replicas: 1
 
   # ---------------------------------------------------------------
