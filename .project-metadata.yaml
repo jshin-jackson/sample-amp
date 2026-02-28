@@ -108,6 +108,7 @@ tasks:
     entity_label: usage_score_predictor
     script: 3_model-usage-predictor/predict.py
     function: predict
+    kernel: python3
 
   # ---------------------------------------------------------------
   # Step 6: Model — Build the model serving Docker image
