@@ -1,7 +1,7 @@
 name: jshin-jackson
 
 entries:
-  - title: Hello World AMP
+  - title: Jackson's AMP
     label: sample-amp
     short_description: |
       The simplest possible Cloudera AI AMP example for beginners.
