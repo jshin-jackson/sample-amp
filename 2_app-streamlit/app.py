@@ -108,14 +108,30 @@ def resolve_model_endpoint():
 # ── Model API Helper ───────────────────────────────────────────────────────────
 
 def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
-    """Call the deployed Usage Score Predictor REST API."""
-    payload = {"request": {"active_users": active_users}}
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
+    """Call the deployed Usage Score Predictor REST API.
+
+    CML 2.0.55 model endpoints expect the access key inside the request body
+    (not as a Bearer token). Format:
+      POST /model/<id>/predict
+      {"accessKey": "<key>", "request": {"active_users": 350}}
+    """
+    payload = {
+        "accessKey": api_key,
+        "request": {"active_users": active_users},
     }
+    headers = {"Content-Type": "application/json"}
     resp = requests.post(endpoint_url, json=payload, headers=headers, timeout=10)
-    resp.raise_for_status()
+
+    # Surface the raw response text for easier debugging if something goes wrong
+    if not resp.ok:
+        raise requests.exceptions.HTTPError(
+            f"HTTP {resp.status_code}: {resp.text[:300]}", response=resp
+        )
+
+    text = resp.text.strip()
+    if not text:
+        raise ValueError(f"Model returned an empty response (status {resp.status_code})")
+
     return resp.json()
 
 
