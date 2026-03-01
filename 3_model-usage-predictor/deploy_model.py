@@ -134,6 +134,29 @@ def main():
     else:
         log(f"  Skipping create — using existing model id={model.id}")
 
+    # Step 2b: Check if model already has an active deployment — skip build if so
+    log("Checking for active deployments...")
+    try:
+        builds = client.list_model_builds(project_id=PROJECT_ID, model_id=model.id)
+        for b in (builds.model_builds or []):
+            deployments = client.list_model_deployments(
+                project_id=PROJECT_ID, model_id=model.id, build_id=b.id
+            )
+            for d in (deployments.model_deployments or []):
+                if d.status in ("deployed", "running"):
+                    log("=" * 55)
+                    log("Model already deployed — skipping build & deploy.")
+                    log(f"  Model ID     : {model.id}")
+                    log(f"  Build ID     : {b.id}")
+                    log(f"  Deployment ID: {d.id}")
+                    log(f"  Status       : {d.status}")
+                    log("Test: Models → Usage Score Predictor → Test tab")
+                    log('Input: {"active_users": 350}')
+                    log("=" * 55)
+                    return
+    except Exception as e:
+        log(f"  Warning: could not check deployments ({e}) — proceeding with fresh build.")
+
     # Step 3: Trigger build — body FIRST, then project_id, then model_id
     # Signature: create_model_build(self, body, project_id, model_id, **kwargs)
     log("Triggering model build...")
