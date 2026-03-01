@@ -115,6 +115,7 @@ tasks:
   # ---------------------------------------------------------------
   - type: build_model
     entity_label: usage_score_predictor
+    comment: "Initial build"
 
   # ---------------------------------------------------------------
   # Step 7: Model — Deploy the model as a REST API endpoint
