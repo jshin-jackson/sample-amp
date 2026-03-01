@@ -78,11 +78,35 @@ def resolve_model_endpoint():
         client = cmlapi.default_client()
         models = client.list_models(project_id=project_id)
         for m in (models.models or []):
-            if m.name == MODEL_NAME:
-                endpoint = getattr(m, "access_url", None) or getattr(m, "endpoint_url", None)
-                key      = getattr(m, "access_key", None)
-                if endpoint and key:
-                    return endpoint, key
+            if m.name != MODEL_NAME:
+                continue
+
+            # Try all known attribute names for access key (varies by CML version)
+            key = (
+                getattr(m, "access_key", None)
+                or getattr(m, "auth_enabled", None)
+            )
+
+            # Try all known attribute names for endpoint URL
+            endpoint = (
+                getattr(m, "access_url", None)
+                or getattr(m, "endpoint_url", None)
+                or getattr(m, "crn", None)
+            )
+
+            # Fallback: construct URL from workspace domain + model id
+            if not endpoint:
+                domain = (
+                    os.environ.get("CDSW_DOMAIN", "")
+                    or os.environ.get("CDSW_PUBLIC_URL", "")
+                )
+                model_id = getattr(m, "id", None)
+                if domain and model_id:
+                    endpoint = f"https://{domain}/model/{model_id}/predict"
+
+            if endpoint and key:
+                return endpoint, key
+
     except Exception:
         pass
 
@@ -250,6 +274,23 @@ with st.expander("Raw Dataset", expanded=False):
 st.subheader("🤖 Real-time Usage Score Prediction")
 
 endpoint_url, api_key = resolve_model_endpoint()
+
+# ── Debug: show raw model attributes (remove after confirming correct attr names)
+with st.expander("🔍 Model Discovery Debug", expanded=False):
+    try:
+        import cmlapi
+        project_id = os.environ.get("CDSW_PROJECT_ID", "")
+        client = cmlapi.default_client()
+        models = client.list_models(project_id=project_id)
+        for m in (models.models or []):
+            if m.name == MODEL_NAME:
+                st.write("**Model object attributes:**")
+                st.json({k: str(v) for k, v in vars(m).items() if not k.startswith("_")})
+                break
+        else:
+            st.write("No model named", MODEL_NAME, "found in this project.")
+    except Exception as e:
+        st.write(f"cmlapi not available: {e}")
 
 if not endpoint_url or not api_key:
     st.info(
