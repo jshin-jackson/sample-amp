@@ -89,7 +89,7 @@ def wait_for_deploy(client, project_id, model_id, build_id, deployment_id, timeo
             deployment_id=deployment_id,
         )
         log(f"  deployment status: {d.status}")
-        if d.status == "running":
+        if d.status in ("running", "deployed"):
             return d
         if d.status in ("failed", "error", "stopped"):
             raise RuntimeError(f"Deployment failed with status: {d.status}")
