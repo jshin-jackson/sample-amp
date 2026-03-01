@@ -110,8 +110,7 @@ def resolve_model_endpoint():
 def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
     """Call the deployed Usage Score Predictor REST API.
 
-    CML 2.0.55 model endpoints expect the access key inside the request body
-    (not as a Bearer token). Format:
+    CML 2.0.55 model endpoints expect the access key inside the request body.
       POST /model/<id>/predict
       {"accessKey": "<key>", "request": {"active_users": 350}}
     """
@@ -122,17 +121,12 @@ def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
     headers = {"Content-Type": "application/json"}
     resp = requests.post(endpoint_url, json=payload, headers=headers, timeout=10)
 
-    # Surface the raw response text for easier debugging if something goes wrong
-    if not resp.ok:
-        raise requests.exceptions.HTTPError(
-            f"HTTP {resp.status_code}: {resp.text[:300]}", response=resp
-        )
-
-    text = resp.text.strip()
-    if not text:
-        raise ValueError(f"Model returned an empty response (status {resp.status_code})")
-
-    return resp.json()
+    # Always raise a detailed error with status + raw body for easy diagnosis
+    raise ValueError(
+        f"DEBUG — status={resp.status_code}  "
+        f"url={endpoint_url}  "
+        f"body={repr(resp.text[:500])}"
+    )
 
 
 # ── Validate Required Environment Variables ────────────────────────────────────
