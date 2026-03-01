@@ -85,14 +85,14 @@ def resolve_model_endpoint():
             model_id  = getattr(m, "id", None)
             key       = getattr(m, "access_key", None)
 
-            # Construct the HTTP endpoint URL from workspace domain + model id.
-            # m.crn is a CDP resource name (not HTTP), so we must build the URL manually.
+            # CML 2.0.55 model API endpoint — the accessKey identifies the model,
+            # so the URL does NOT include the model ID.
             domain = (
                 os.environ.get("CDSW_DOMAIN", "")
                 or os.environ.get("CDSW_PUBLIC_URL", "").lstrip("https://").lstrip("http://")
             )
-            if domain and model_id:
-                endpoint = f"https://{domain}/model/{model_id}/predict"
+            if domain:
+                endpoint = f"https://{domain}/api/altus-ds-1/models/call-model"
             else:
                 endpoint = None
 
@@ -110,9 +110,11 @@ def resolve_model_endpoint():
 def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
     """Call the deployed Usage Score Predictor REST API.
 
-    CML 2.0.55 model endpoints expect the access key inside the request body.
-      POST /model/<id>/predict
+    CML 2.0.55 model API:
+      POST https://{domain}/api/altus-ds-1/models/call-model
       {"accessKey": "<key>", "request": {"active_users": 350}}
+
+    The accessKey identifies the specific model — no model ID in the URL.
     """
     payload = {
         "accessKey": api_key,
@@ -121,12 +123,16 @@ def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
     headers = {"Content-Type": "application/json"}
     resp = requests.post(endpoint_url, json=payload, headers=headers, timeout=10)
 
-    # Always raise a detailed error with status + raw body for easy diagnosis
-    raise ValueError(
-        f"DEBUG — status={resp.status_code}  "
-        f"url={endpoint_url}  "
-        f"body={repr(resp.text[:500])}"
-    )
+    if not resp.ok:
+        raise requests.exceptions.HTTPError(
+            f"HTTP {resp.status_code}: {resp.text[:300]}", response=resp
+        )
+
+    text = resp.text.strip()
+    if not text:
+        raise ValueError(f"Model returned empty response (status {resp.status_code})")
+
+    return resp.json()
 
 
 # ── Validate Required Environment Variables ────────────────────────────────────
