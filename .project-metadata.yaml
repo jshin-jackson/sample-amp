@@ -101,31 +101,22 @@ tasks:
     memory: 4
 
   # ---------------------------------------------------------------
-  # Step 5: Model — Register the model serving function with CML
+  # Step 5: Session — Create, build, and deploy model via cmlapi
   # ---------------------------------------------------------------
-  - type: create_model
-    name: Usage Score Predictor
-    entity_label: usage_score_predictor
-    script: 3_model-usage-predictor/predict.py
-    function: predict
+  # NOTE: AMP create_model/build_model/deploy_model tasks do not work
+  # correctly in CML 2.0.55 (model is created without file/function/runtime).
+  # This session uses cmlapi directly to perform all three operations.
+  - type: run_session
+    name: Deploy Usage Score Predictor
+    script: 3_model-usage-predictor/deploy_model.py
+    short_summary: Create, build, and deploy the Usage Score Predictor model via cmlapi
+    long_summary: >-
+      Uses the CML Python SDK (cmlapi) to create the model with the correct
+      runtime, trigger a Docker image build, and deploy it as a REST API.
+      Workaround for CML 2.0.55 where AMP model tasks omit file/function/runtime.
     kernel: python3
-    runtime_identifier: docker.repository.cloudera.com/cloudera/cdsw/ml-runtime-pbj-workbench-python3.11-standard:2026.01.1-b6
-
-  # ---------------------------------------------------------------
-  # Step 6: Model — Build the model serving Docker image
-  # ---------------------------------------------------------------
-  - type: build_model
-    entity_label: usage_score_predictor
-    comment: "Initial build"
-
-  # ---------------------------------------------------------------
-  # Step 7: Model — Deploy the model as a REST API endpoint
-  # ---------------------------------------------------------------
-  - type: deploy_model
-    entity_label: usage_score_predictor
-    cpu: 4
-    memory: 8
-    replicas: 1
+    cpu: 2
+    memory: 4
 
   # ---------------------------------------------------------------
   # Step 8: Application — Launch the Streamlit dashboard
