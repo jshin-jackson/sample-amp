@@ -69,9 +69,9 @@ def wait_for_build(client, project_id, model_id, build_id, timeout):
     while elapsed < timeout:
         b = client.get_model_build(project_id=project_id, model_id=model_id, build_id=build_id)
         log(f"  build status: {b.status}")
-        if b.status in ("built", "succeeded"):
+        if b.status in ("built", "succeeded", "push_succeeded", "available"):
             return b
-        if b.status in ("failed", "error", "build failed", "timedout"):
+        if b.status in ("failed", "error", "build failed", "timedout", "build_failed", "push_failed"):
             raise RuntimeError(f"Build failed with status: {b.status}")
         time.sleep(POLL_INTERVAL_SEC)
         elapsed += POLL_INTERVAL_SEC
