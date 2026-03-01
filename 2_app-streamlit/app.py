@@ -81,28 +81,20 @@ def resolve_model_endpoint():
             if m.name != MODEL_NAME:
                 continue
 
-            # Try all known attribute names for access key (varies by CML version)
-            key = (
-                getattr(m, "access_key", None)
-                or getattr(m, "auth_enabled", None)
-            )
+            # cmlapi model objects use Python properties — use getattr directly
+            model_id  = getattr(m, "id", None)
+            key       = getattr(m, "access_key", None)
 
-            # Try all known attribute names for endpoint URL
-            endpoint = (
-                getattr(m, "access_url", None)
-                or getattr(m, "endpoint_url", None)
-                or getattr(m, "crn", None)
+            # Construct the HTTP endpoint URL from workspace domain + model id.
+            # m.crn is a CDP resource name (not HTTP), so we must build the URL manually.
+            domain = (
+                os.environ.get("CDSW_DOMAIN", "")
+                or os.environ.get("CDSW_PUBLIC_URL", "").lstrip("https://").lstrip("http://")
             )
-
-            # Fallback: construct URL from workspace domain + model id
-            if not endpoint:
-                domain = (
-                    os.environ.get("CDSW_DOMAIN", "")
-                    or os.environ.get("CDSW_PUBLIC_URL", "")
-                )
-                model_id = getattr(m, "id", None)
-                if domain and model_id:
-                    endpoint = f"https://{domain}/model/{model_id}/predict"
+            if domain and model_id:
+                endpoint = f"https://{domain}/model/{model_id}/predict"
+            else:
+                endpoint = None
 
             if endpoint and key:
                 return endpoint, key
@@ -275,7 +267,7 @@ st.subheader("🤖 Real-time Usage Score Prediction")
 
 endpoint_url, api_key = resolve_model_endpoint()
 
-# ── Debug: show raw model attributes (remove after confirming correct attr names)
+# ── Debug: show resolved endpoint info (remove after confirming correct behavior)
 with st.expander("🔍 Model Discovery Debug", expanded=False):
     try:
         import cmlapi
@@ -284,13 +276,26 @@ with st.expander("🔍 Model Discovery Debug", expanded=False):
         models = client.list_models(project_id=project_id)
         for m in (models.models or []):
             if m.name == MODEL_NAME:
-                st.write("**Model object attributes:**")
-                st.json({k: str(v) for k, v in vars(m).items() if not k.startswith("_")})
+                # Use dir() to list all accessible (non-private, non-callable) attributes
+                attrs = {}
+                for attr in sorted(dir(m)):
+                    if attr.startswith("_"):
+                        continue
+                    try:
+                        val = getattr(m, attr)
+                        if not callable(val):
+                            attrs[attr] = str(val)
+                    except Exception:
+                        pass
+                st.write("**Model object properties (via dir):**")
+                st.json(attrs)
+                st.write(f"**CDSW_DOMAIN:** `{os.environ.get('CDSW_DOMAIN', 'not set')}`")
+                st.write(f"**CDSW_PUBLIC_URL:** `{os.environ.get('CDSW_PUBLIC_URL', 'not set')}`")
                 break
         else:
             st.write("No model named", MODEL_NAME, "found in this project.")
     except Exception as e:
-        st.write(f"cmlapi not available: {e}")
+        st.write(f"cmlapi not available or error: {e}")
 
 if not endpoint_url or not api_key:
     st.info(
