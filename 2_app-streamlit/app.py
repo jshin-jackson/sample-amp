@@ -10,7 +10,11 @@ It demonstrates:
   - Type conversion for env var values (str → int, str → bool)
   - Graceful error messaging when required config is missing
   - Live REST API call to a deployed CML Model for real-time predictions
-    (MODEL_ENDPOINT_URL, MODEL_API_KEY)
+
+Model endpoint discovery (priority order):
+  1. MODEL_ENDPOINT_URL + MODEL_API_KEY environment variables (manual override)
+  2. cmlapi auto-discovery: queries this project's deployed models by name
+  3. If neither is available, the prediction panel shows an info message
 """
 
 import os
@@ -32,9 +36,10 @@ DASHBOARD_TITLE          = os.environ.get("DASHBOARD_TITLE", "")
 SCORE_ALERT_THRESHOLD    = int(os.environ.get("SCORE_ALERT_THRESHOLD", "80"))
 ENABLE_RAW_DATA_DOWNLOAD = os.environ.get("ENABLE_RAW_DATA_DOWNLOAD", "true").lower() == "true"
 
-# Level 5: model API config
+# Level 5: model API config (manual override — optional)
 MODEL_ENDPOINT_URL = os.environ.get("MODEL_ENDPOINT_URL", "")
 MODEL_API_KEY      = os.environ.get("MODEL_API_KEY", "")
+MODEL_NAME         = "Usage Score Predictor"
 
 CSV_PATH  = Path(REPORT_DIR) / f"{REPORT_NAME}.csv"
 JSON_PATH = Path(REPORT_DIR) / f"{REPORT_NAME}.json"
@@ -47,16 +52,53 @@ st.set_page_config(
 )
 
 
+# ── Model Endpoint Auto-discovery ─────────────────────────────────────────────
+
+@st.cache_resource
+def resolve_model_endpoint():
+    """
+    Resolve model endpoint URL and API key.
+
+    Priority:
+      1. Environment variables (MODEL_ENDPOINT_URL + MODEL_API_KEY)
+      2. cmlapi auto-discovery from this project's deployed models
+      3. Return (None, None) if model is not deployed
+    """
+    # Priority 1: explicit env vars
+    if MODEL_ENDPOINT_URL and MODEL_API_KEY:
+        return MODEL_ENDPOINT_URL, MODEL_API_KEY
+
+    # Priority 2: cmlapi auto-discovery
+    try:
+        import cmlapi
+        project_id = os.environ.get("CDSW_PROJECT_ID", "")
+        if not project_id:
+            return None, None
+
+        client = cmlapi.default_client()
+        models = client.list_models(project_id=project_id)
+        for m in (models.models or []):
+            if m.name == MODEL_NAME:
+                endpoint = getattr(m, "access_url", None) or getattr(m, "endpoint_url", None)
+                key      = getattr(m, "access_key", None)
+                if endpoint and key:
+                    return endpoint, key
+    except Exception:
+        pass
+
+    return None, None
+
+
 # ── Model API Helper ───────────────────────────────────────────────────────────
 
-def call_model(active_users: int) -> dict:
+def call_model(endpoint_url: str, api_key: str, active_users: int) -> dict:
     """Call the deployed Usage Score Predictor REST API."""
     payload = {"request": {"active_users": active_users}}
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {MODEL_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
     }
-    resp = requests.post(MODEL_ENDPOINT_URL, json=payload, headers=headers, timeout=10)
+    resp = requests.post(endpoint_url, json=payload, headers=headers, timeout=10)
     resp.raise_for_status()
     return resp.json()
 
@@ -207,16 +249,24 @@ with st.expander("Raw Dataset", expanded=False):
 
 st.subheader("🤖 Real-time Usage Score Prediction")
 
-if not MODEL_ENDPOINT_URL or not MODEL_API_KEY:
+endpoint_url, api_key = resolve_model_endpoint()
+
+if not endpoint_url or not api_key:
     st.info(
-        "**Model API not configured.**  \n"
-        "Set `MODEL_ENDPOINT_URL` and `MODEL_API_KEY` environment variables "
-        "to enable live predictions.\n\n"
-        "Find these values in **Models → Usage Score Predictor → Overview**.",
+        "**Model not available.**  \n"
+        "The *Usage Score Predictor* model is not deployed yet, or its endpoint "
+        "could not be resolved automatically.\n\n"
+        "**Option A** — Wait for AMP Step 5 (deploy_model.py) to complete, "
+        "then refresh this page.  \n"
+        "**Option B** — Set `MODEL_ENDPOINT_URL` and `MODEL_API_KEY` environment "
+        "variables manually via Applications → Edit.",
         icon="ℹ️",
     )
 else:
-    st.caption("Enter the number of active users to get a predicted usage score from the deployed model.")
+    st.caption(
+        "Enter the number of active users to get a predicted usage score from the deployed model.  \n"
+        f"Endpoint auto-discovered via {'environment variables' if MODEL_ENDPOINT_URL else 'cmlapi'}."
+    )
 
     active_users_input = st.slider(
         "Active Users",
@@ -229,15 +279,18 @@ else:
     if st.button("Predict Usage Score", type="primary"):
         with st.spinner("Calling model API..."):
             try:
-                result = call_model(active_users_input)
+                result = call_model(endpoint_url, api_key, active_users_input)
                 predicted_score = result.get("response", {}).get("usage_score", result.get("response"))
                 st.success(f"**Predicted Usage Score: {predicted_score}**")
                 col_a, col_b = st.columns(2)
                 col_a.metric("Active Users (input)", active_users_input)
-                col_b.metric("Predicted Score", predicted_score,
-                             delta=f"{'▲ High Performer' if float(predicted_score) >= SCORE_ALERT_THRESHOLD else '▽ Below threshold'}")
+                col_b.metric(
+                    "Predicted Score",
+                    predicted_score,
+                    delta="▲ High Performer" if float(predicted_score) >= SCORE_ALERT_THRESHOLD else "▽ Below threshold",
+                )
             except requests.exceptions.ConnectionError:
-                st.error("Could not connect to the model endpoint. Check `MODEL_ENDPOINT_URL`.", icon="🚫")
+                st.error("Could not connect to the model endpoint.", icon="🚫")
             except requests.exceptions.HTTPError as e:
                 st.error(f"Model API returned an error: {e}", icon="🚫")
             except Exception as e:
