@@ -109,6 +109,7 @@ tasks:
     script: 3_model-usage-predictor/predict.py
     function: predict
     kernel: python3
+    runtime_identifier: docker.repository.cloudera.com/cloudera/cdsw/ml-runtime-pbj-workbench-python3.11-standard:2026.01.1-b6
 
   # ---------------------------------------------------------------
   # Step 6: Model — Build the model serving Docker image
