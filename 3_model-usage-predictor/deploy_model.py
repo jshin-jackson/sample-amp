@@ -100,19 +100,16 @@ def main():
             log("  Deleted.")
             break
 
-    # Step 2: Create model with full configuration
+    # Step 2: Create model (name/description only — file/function/runtime go in build)
     log(f"Creating model '{MODEL_NAME}'...")
     create_body = cmlapi.CreateModelRequest(
         name=MODEL_NAME,
         description="Predicts usage score from active user count (LinearRegression)",
-        file_path=MODEL_FILE,
-        function_name=MODEL_FUNCTION,
-        runtime_identifier=MODEL_RUNTIME,
     )
     model = client.create_model(PROJECT_ID, create_body)
     log(f"  Model created: id={model.id}")
 
-    # Step 3: Trigger build
+    # Step 3: Trigger build (file_path, function_name, runtime_identifier set here)
     log("Triggering model build...")
     build_body = cmlapi.CreateModelBuildRequest(
         comment=BUILD_COMMENT,
