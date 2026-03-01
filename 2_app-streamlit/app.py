@@ -1,6 +1,6 @@
 """
-Level 3 - Advanced Environment Variables
-=========================================
+Level 5 - Model API Integration
+=================================
 This script runs as a CML Application (start_application task).
 
 It demonstrates:
@@ -9,12 +9,15 @@ It demonstrates:
     ENABLE_RAW_DATA_DOWNLOAD)
   - Type conversion for env var values (str → int, str → bool)
   - Graceful error messaging when required config is missing
+  - Live REST API call to a deployed CML Model for real-time predictions
+    (MODEL_ENDPOINT_URL, MODEL_API_KEY)
 """
 
 import os
 import json
 from pathlib import Path
 
+import requests
 import pandas as pd
 import streamlit as st
 
@@ -25,9 +28,13 @@ REPORT_DIR  = os.environ.get("REPORT_OUTPUT_DIR", "outputs")
 REPORT_NAME = os.environ.get("REPORT_NAME", "data_report")
 
 # Level 3: runtime behavior config
-DASHBOARD_TITLE         = os.environ.get("DASHBOARD_TITLE", "")
-SCORE_ALERT_THRESHOLD   = int(os.environ.get("SCORE_ALERT_THRESHOLD", "80"))
+DASHBOARD_TITLE          = os.environ.get("DASHBOARD_TITLE", "")
+SCORE_ALERT_THRESHOLD    = int(os.environ.get("SCORE_ALERT_THRESHOLD", "80"))
 ENABLE_RAW_DATA_DOWNLOAD = os.environ.get("ENABLE_RAW_DATA_DOWNLOAD", "true").lower() == "true"
+
+# Level 5: model API config
+MODEL_ENDPOINT_URL = os.environ.get("MODEL_ENDPOINT_URL", "")
+MODEL_API_KEY      = os.environ.get("MODEL_API_KEY", "")
 
 CSV_PATH  = Path(REPORT_DIR) / f"{REPORT_NAME}.csv"
 JSON_PATH = Path(REPORT_DIR) / f"{REPORT_NAME}.json"
@@ -38,6 +45,20 @@ st.set_page_config(
     page_icon="🌐",
     layout="wide",
 )
+
+
+# ── Model API Helper ───────────────────────────────────────────────────────────
+
+def call_model(active_users: int) -> dict:
+    """Call the deployed Usage Score Predictor REST API."""
+    payload = {"request": {"active_users": active_users}}
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {MODEL_API_KEY}",
+    }
+    resp = requests.post(MODEL_ENDPOINT_URL, json=payload, headers=headers, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
 
 
 # ── Validate Required Environment Variables ────────────────────────────────────
@@ -58,7 +79,7 @@ if not DASHBOARD_TITLE:
 
 st.title(DASHBOARD_TITLE)
 st.caption(
-    f"Level 3 · Cloudera AI · Applied ML Prototype · "
+    f"Level 5 · Cloudera AI · Applied ML Prototype · "
     f"Alert threshold: **{SCORE_ALERT_THRESHOLD}** · "
     f"Downloads: **{'enabled' if ENABLE_RAW_DATA_DOWNLOAD else 'disabled'}**"
 )
@@ -182,9 +203,51 @@ with st.expander("Raw Dataset", expanded=False):
         st.caption("_CSV download is disabled by the `ENABLE_RAW_DATA_DOWNLOAD` environment variable._")
 
 
-# ── Footer ────────────────────────────────────────────────────────────────────
+# ── Level 5: Real-time Model Prediction ───────────────────────────────────────
+
+st.subheader("🤖 Real-time Usage Score Prediction")
+
+if not MODEL_ENDPOINT_URL or not MODEL_API_KEY:
+    st.info(
+        "**Model API not configured.**  \n"
+        "Set `MODEL_ENDPOINT_URL` and `MODEL_API_KEY` environment variables "
+        "to enable live predictions.\n\n"
+        "Find these values in **Models → Usage Score Predictor → Overview**.",
+        icon="ℹ️",
+    )
+else:
+    st.caption("Enter the number of active users to get a predicted usage score from the deployed model.")
+
+    active_users_input = st.slider(
+        "Active Users",
+        min_value=0,
+        max_value=1000,
+        value=300,
+        step=10,
+    )
+
+    if st.button("Predict Usage Score", type="primary"):
+        with st.spinner("Calling model API..."):
+            try:
+                result = call_model(active_users_input)
+                predicted_score = result.get("response", {}).get("usage_score", result.get("response"))
+                st.success(f"**Predicted Usage Score: {predicted_score}**")
+                col_a, col_b = st.columns(2)
+                col_a.metric("Active Users (input)", active_users_input)
+                col_b.metric("Predicted Score", predicted_score,
+                             delta=f"{'▲ High Performer' if float(predicted_score) >= SCORE_ALERT_THRESHOLD else '▽ Below threshold'}")
+            except requests.exceptions.ConnectionError:
+                st.error("Could not connect to the model endpoint. Check `MODEL_ENDPOINT_URL`.", icon="🚫")
+            except requests.exceptions.HTTPError as e:
+                st.error(f"Model API returned an error: {e}", icon="🚫")
+            except Exception as e:
+                st.error(f"Unexpected error: {e}", icon="🚫")
 
 st.divider()
+
+
+# ── Footer ────────────────────────────────────────────────────────────────────
+
 st.caption(
     f"Report generated at: `{summary['generated_at']}` · "
     f"Python `{summary['python_version']}` · "

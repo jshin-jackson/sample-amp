@@ -1,12 +1,12 @@
 name: Jackson's AMP
 description: >-
-  Level 4 AMP example for beginners learning Cloudera AI.
-  Demonstrates model training, registration, build, and deployment using
-  create_model, build_model, and deploy_model tasks.
+  Level 5 AMP example for beginners learning Cloudera AI.
+  Demonstrates end-to-end ML integration: model REST API is called live
+  from the Streamlit dashboard for real-time usage score predictions.
 author: Jackson Shin
 specification_version: 1.0
-prototype_version: 5.0
-date: "2026-02-27"
+prototype_version: 6.0
+date: "2026-03-01"
 
 runtimes:
   - editor: PBJ Workbench
@@ -22,6 +22,20 @@ environment_variables:
   REPORT_NAME:
     default: "data_report"
     description: "Base filename for the generated report (without extension)."
+    required: false
+
+  # ── Level 5: Model API Integration ──────────────────────────────────────────
+  MODEL_ENDPOINT_URL:
+    description: >-
+      [REQUIRED for predictions] The REST endpoint URL of the deployed
+      Usage Score Predictor model. Found in Models → Usage Score Predictor
+      → Overview tab. Example: https://ml-xxx.cloudera.site/model/...
+    required: false
+
+  MODEL_API_KEY:
+    description: >-
+      API key for authenticating calls to the model endpoint.
+      Found in Models → Usage Score Predictor → Overview tab → Access Key.
     required: false
 
   # ── Level 3: Dashboard Runtime Configuration ─────────────────────────────────
