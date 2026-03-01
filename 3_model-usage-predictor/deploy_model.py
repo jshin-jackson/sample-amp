@@ -102,30 +102,25 @@ def main():
 
     # Step 2: Create model with full configuration
     log(f"Creating model '{MODEL_NAME}'...")
-    model = client.create_model(
-        project_id=PROJECT_ID,
-        CreateModelRequest={
-            "name": MODEL_NAME,
-            "description": "Predicts usage score from active user count (LinearRegression)",
-            "file_path": MODEL_FILE,
-            "function_name": MODEL_FUNCTION,
-            "runtime_identifier": MODEL_RUNTIME,
-        },
+    create_body = cmlapi.CreateModelRequest(
+        name=MODEL_NAME,
+        description="Predicts usage score from active user count (LinearRegression)",
+        file_path=MODEL_FILE,
+        function_name=MODEL_FUNCTION,
+        runtime_identifier=MODEL_RUNTIME,
     )
+    model = client.create_model(PROJECT_ID, create_body)
     log(f"  Model created: id={model.id}")
 
     # Step 3: Trigger build
     log("Triggering model build...")
-    build = client.create_model_build(
-        project_id=PROJECT_ID,
-        model_id=model.id,
-        CreateModelBuildRequest={
-            "comment": BUILD_COMMENT,
-            "file_path": MODEL_FILE,
-            "function_name": MODEL_FUNCTION,
-            "runtime_identifier": MODEL_RUNTIME,
-        },
+    build_body = cmlapi.CreateModelBuildRequest(
+        comment=BUILD_COMMENT,
+        file_path=MODEL_FILE,
+        function_name=MODEL_FUNCTION,
+        runtime_identifier=MODEL_RUNTIME,
     )
+    build = client.create_model_build(PROJECT_ID, model.id, build_body)
     log(f"  Build created: id={build.id}")
 
     # Step 4: Wait for build
@@ -134,16 +129,12 @@ def main():
 
     # Step 5: Deploy
     log("Deploying model...")
-    deployment = client.create_model_deployment(
-        project_id=PROJECT_ID,
-        model_id=model.id,
-        build_id=build.id,
-        CreateModelDeploymentRequest={
-            "cpu": DEPLOY_CPU,
-            "memory": DEPLOY_MEMORY,
-            "replicas": DEPLOY_REPLICAS,
-        },
+    deploy_body = cmlapi.CreateModelDeploymentRequest(
+        cpu=DEPLOY_CPU,
+        memory=DEPLOY_MEMORY,
+        replicas=DEPLOY_REPLICAS,
     )
+    deployment = client.create_model_deployment(PROJECT_ID, model.id, build.id, deploy_body)
     log(f"  Deployment created: id={deployment.id}")
 
     # Step 6: Wait for deployment
