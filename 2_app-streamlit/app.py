@@ -267,35 +267,6 @@ st.subheader("🤖 Real-time Usage Score Prediction")
 
 endpoint_url, api_key = resolve_model_endpoint()
 
-# ── Debug: show resolved endpoint info (remove after confirming correct behavior)
-with st.expander("🔍 Model Discovery Debug", expanded=False):
-    try:
-        import cmlapi
-        project_id = os.environ.get("CDSW_PROJECT_ID", "")
-        client = cmlapi.default_client()
-        models = client.list_models(project_id=project_id)
-        for m in (models.models or []):
-            if m.name == MODEL_NAME:
-                # Use dir() to list all accessible (non-private, non-callable) attributes
-                attrs = {}
-                for attr in sorted(dir(m)):
-                    if attr.startswith("_"):
-                        continue
-                    try:
-                        val = getattr(m, attr)
-                        if not callable(val):
-                            attrs[attr] = str(val)
-                    except Exception:
-                        pass
-                st.write("**Model object properties (via dir):**")
-                st.json(attrs)
-                st.write(f"**CDSW_DOMAIN:** `{os.environ.get('CDSW_DOMAIN', 'not set')}`")
-                st.write(f"**CDSW_PUBLIC_URL:** `{os.environ.get('CDSW_PUBLIC_URL', 'not set')}`")
-                break
-        else:
-            st.write("No model named", MODEL_NAME, "found in this project.")
-    except Exception as e:
-        st.write(f"cmlapi not available or error: {e}")
 
 if not endpoint_url or not api_key:
     st.info(
