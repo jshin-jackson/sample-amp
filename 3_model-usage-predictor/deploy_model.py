@@ -105,30 +105,34 @@ def main():
 
     log(f"Project ID: {PROJECT_ID}")
 
-    # Step 1: Delete existing model if present (clean slate)
+    # Step 1: Find existing model or create new one
+    # Note: delete_model is not implemented in CML 2.0.55 (returns 501).
+    # Instead, reuse the existing model if it already exists.
     log(f"Checking for existing model '{MODEL_NAME}'...")
+    model = None
     models = client.list_models(project_id=PROJECT_ID)
     for m in (models.models or []):
         if m.name == MODEL_NAME:
-            log(f"  Deleting existing model: {m.id}")
-            client.delete_model(project_id=PROJECT_ID, model_id=m.id)
-            time.sleep(5)
-            log("  Deleted.")
+            log(f"  Found existing model: id={m.id} — reusing it.")
+            model = m
             break
 
-    # Step 2: Create model — body FIRST, then project_id
-    # Signature: create_model(self, body, project_id, **kwargs)
-    log(f"Creating model '{MODEL_NAME}'...")
-    create_body = cmlapi.CreateModelRequest(
-        name=MODEL_NAME,
-        description="Predicts usage score from active user count (LinearRegression)",
-    )
-    try:
-        model = client.create_model(create_body, PROJECT_ID)
-    except Exception as e:
-        log(f"ERROR creating model: {type(e).__name__}: {e}")
-        raise
-    log(f"  Model created: id={model.id}")
+    if model is None:
+        # Step 2: Create model — body FIRST, then project_id
+        # Signature: create_model(self, body, project_id, **kwargs)
+        log(f"Creating model '{MODEL_NAME}'...")
+        create_body = cmlapi.CreateModelRequest(
+            name=MODEL_NAME,
+            description="Predicts usage score from active user count (LinearRegression)",
+        )
+        try:
+            model = client.create_model(create_body, PROJECT_ID)
+        except Exception as e:
+            log(f"ERROR creating model: {type(e).__name__}: {e}")
+            raise
+        log(f"  Model created: id={model.id}")
+    else:
+        log(f"  Skipping create — using existing model id={model.id}")
 
     # Step 3: Trigger build — body FIRST, then project_id, then model_id
     # Signature: create_model_build(self, body, project_id, model_id, **kwargs)
