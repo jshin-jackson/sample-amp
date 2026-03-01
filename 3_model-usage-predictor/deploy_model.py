@@ -12,13 +12,28 @@ Background:
 
 What this script does:
   1. Deletes any existing model with the same name (clean slate)
-  2. Creates the model with file, function, and runtime_identifier
-  3. Triggers a build and waits for it to complete
-  4. Deploys the built model and waits until it is Running
+  2. Creates the model (name/description only)
+  3. Triggers a build with file_path, function_name, runtime_identifier
+  4. Waits for build to complete
+  5. Deploys the built model and waits until it is Running
 
 Runtime Image used (matches the manual deployment that succeeded):
   docker.repository.cloudera.com/cloudera/cdsw/ml-runtime-pbj-workbench-python3.11-standard:2026.01.1-b6
+
+CML 2.0.55 cmlapi call convention:
+  All mutating API calls follow positional order: (body, project_id, ...)
+  e.g. client.create_model(body, project_id)
+       client.create_model_build(body, project_id, model_id)
+       client.create_model_deployment(body, project_id, model_id, build_id)
 """
+
+# Fix urllib3 2.x incompatibility with cmlapi:
+# urllib3 2.0 removed getheaders(); cmlapi/rest.py still calls it.
+# Monkey-patch restores the method so ApiException is raised correctly,
+# surfacing the real HTTP error message instead of AttributeError.
+import urllib3.response as _urllib3_resp
+if not hasattr(_urllib3_resp.HTTPResponse, "getheaders"):
+    _urllib3_resp.HTTPResponse.getheaders = lambda self: dict(self.headers)
 
 import os
 import time
@@ -45,11 +60,11 @@ PROJECT_ID = os.environ["CDSW_PROJECT_ID"]
 
 def log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{ts}] {msg}")
+    print(f"[{ts}] {msg}", flush=True)
 
 
 def wait_for_build(client, project_id, model_id, build_id, timeout):
-    log(f"Waiting for build {build_id} to complete (timeout: {timeout}s)...")
+    log(f"Waiting for build {build_id} (timeout: {timeout}s)...")
     elapsed = 0
     while elapsed < timeout:
         b = client.get_model_build(project_id=project_id, model_id=model_id, build_id=build_id)
@@ -89,10 +104,10 @@ def main():
 
     log(f"Project ID: {PROJECT_ID}")
 
-    # Step 1: Delete existing model if present
+    # Step 1: Delete existing model if present (clean slate)
     log(f"Checking for existing model '{MODEL_NAME}'...")
     models = client.list_models(project_id=PROJECT_ID)
-    for m in models.models:
+    for m in (models.models or []):
         if m.name == MODEL_NAME:
             log(f"  Deleting existing model: {m.id}")
             client.delete_model(project_id=PROJECT_ID, model_id=m.id)
@@ -100,16 +115,22 @@ def main():
             log("  Deleted.")
             break
 
-    # Step 2: Create model (name/description only — file/function/runtime go in build)
+    # Step 2: Create model — body FIRST, then project_id
+    # Signature: create_model(self, body, project_id, **kwargs)
     log(f"Creating model '{MODEL_NAME}'...")
     create_body = cmlapi.CreateModelRequest(
         name=MODEL_NAME,
         description="Predicts usage score from active user count (LinearRegression)",
     )
-    model = client.create_model(PROJECT_ID, create_body)
+    try:
+        model = client.create_model(create_body, PROJECT_ID)
+    except Exception as e:
+        log(f"ERROR creating model: {type(e).__name__}: {e}")
+        raise
     log(f"  Model created: id={model.id}")
 
-    # Step 3: Trigger build (file_path, function_name, runtime_identifier set here)
+    # Step 3: Trigger build — body FIRST, then project_id, then model_id
+    # Signature: create_model_build(self, body, project_id, model_id, **kwargs)
     log("Triggering model build...")
     build_body = cmlapi.CreateModelBuildRequest(
         comment=BUILD_COMMENT,
@@ -117,24 +138,33 @@ def main():
         function_name=MODEL_FUNCTION,
         runtime_identifier=MODEL_RUNTIME,
     )
-    build = client.create_model_build(PROJECT_ID, model.id, build_body)
+    try:
+        build = client.create_model_build(build_body, PROJECT_ID, model.id)
+    except Exception as e:
+        log(f"ERROR creating build: {type(e).__name__}: {e}")
+        raise
     log(f"  Build created: id={build.id}")
 
-    # Step 4: Wait for build
+    # Step 4: Wait for build to complete
     wait_for_build(client, PROJECT_ID, model.id, build.id, BUILD_TIMEOUT_SEC)
     log("Build completed successfully.")
 
-    # Step 5: Deploy
+    # Step 5: Deploy — body FIRST, then project_id, model_id, build_id
+    # Signature: create_model_deployment(self, body, project_id, model_id, build_id, **kwargs)
     log("Deploying model...")
     deploy_body = cmlapi.CreateModelDeploymentRequest(
         cpu=DEPLOY_CPU,
         memory=DEPLOY_MEMORY,
         replicas=DEPLOY_REPLICAS,
     )
-    deployment = client.create_model_deployment(PROJECT_ID, model.id, build.id, deploy_body)
+    try:
+        deployment = client.create_model_deployment(deploy_body, PROJECT_ID, model.id, build.id)
+    except Exception as e:
+        log(f"ERROR creating deployment: {type(e).__name__}: {e}")
+        raise
     log(f"  Deployment created: id={deployment.id}")
 
-    # Step 6: Wait for deployment
+    # Step 6: Wait for deployment to become running
     wait_for_deploy(client, PROJECT_ID, model.id, deployment.id, DEPLOY_TIMEOUT_SEC)
 
     log("=" * 55)
