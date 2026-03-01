@@ -78,13 +78,14 @@ def wait_for_build(client, project_id, model_id, build_id, timeout):
     raise TimeoutError(f"Build did not complete within {timeout}s")
 
 
-def wait_for_deploy(client, project_id, model_id, deployment_id, timeout):
+def wait_for_deploy(client, project_id, model_id, build_id, deployment_id, timeout):
     log(f"Waiting for deployment {deployment_id} to become running (timeout: {timeout}s)...")
     elapsed = 0
     while elapsed < timeout:
         d = client.get_model_deployment(
             project_id=project_id,
             model_id=model_id,
+            build_id=build_id,
             deployment_id=deployment_id,
         )
         log(f"  deployment status: {d.status}")
@@ -165,7 +166,7 @@ def main():
     log(f"  Deployment created: id={deployment.id}")
 
     # Step 6: Wait for deployment to become running
-    wait_for_deploy(client, PROJECT_ID, model.id, deployment.id, DEPLOY_TIMEOUT_SEC)
+    wait_for_deploy(client, PROJECT_ID, model.id, build.id, deployment.id, DEPLOY_TIMEOUT_SEC)
 
     log("=" * 55)
     log("Model deployment SUCCEEDED!")
